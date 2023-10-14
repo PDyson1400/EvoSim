@@ -12,6 +12,7 @@ Use controller.play(x) in the console to change the automatic speed, default is 
 
 In the console it will say the step, the quantified traits of the survivors, and the generation
 
+
 **Modifying settings**
 
 `const controller = new Controller(500, 10, 1, 4, 300, 10, [0, 0], [0.1, 1]);` in the Controller in #region Running Code
