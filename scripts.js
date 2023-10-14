@@ -21,19 +21,14 @@ function copyArr(array)
 //#endregion
 
 // #region Classes
-
-//TODO
-// Clean up everything, try to remove for loops
-// Add Inhibitory type neurons
-
 class Neuron
 {
     constructor(parent, connections, neuronNumber, entity1 = false, entity2 = false)
     {
+        this.stimuli = copyArr(parent.stimuli);
+        this.types = copyArr(parent.types);
+        this.output = copyArr(parent.output);
         this.parent = parent;
-        this.stimuli = copyArr(this.parent.stimuli);
-        this.types = copyArr(this.parent.types);
-        this.output = copyArr(this.parent.output);
         
         this.connections = [];
         this.neuronNumber = neuronNumber;
@@ -51,7 +46,7 @@ class Neuron
 
     createConnection(stimulus, type, output)
     {
-        const connection = {"stimulus": stimulus, "type": type, "output": output}
+        const connection = {"stimulus": stimulus, "type": type, "output": output};
         this.connections.push(connection);
     }
 
@@ -61,7 +56,7 @@ class Neuron
         const able = choose(this.types);
         const result = choose(this.output);
 
-        this.createConnection(stimulus, able, result)
+        this.createConnection(stimulus, able, result);
     }
 
     inheritConnection(entity1, entity2, i)
@@ -76,111 +71,84 @@ class Neuron
             this.createRandConnection();
         } else if (rand > mutation && rand <= mutation + parentRate)
         {
-            let stimulus = entity1.neurons[this.neuronNumber].connections[i].stimulus;
-            let able = entity1.neurons[this.neuronNumber].connections[i].type;
-            let result = entity1.neurons[this.neuronNumber].connections[i].output;
-
-            this.createConnection(stimulus, able, result)
+            const entity1NeuronConnection = entity1.neurons[this.neuronNumber].connections[i];
+            this.createConnection(entity1NeuronConnection.stimulus, entity1NeuronConnection.type, entity1NeuronConnection.output);
         } else {
-            let stimulus = entity2.neurons[this.neuronNumber].connections[i].stimulus;
-            let able = entity2.neurons[this.neuronNumber].connections[i].type;
-            let result = entity2.neurons[this.neuronNumber].connections[i].output;
-
-            this.createConnection(stimulus, able, result)
+            const entity2NeuronConnection = entity2.neurons[this.neuronNumber].connections[i];
+            this.createConnection(entity2NeuronConnection.stimulus, entity2NeuronConnection.type, entity2NeuronConnection.output);
         }
     }
 
     moveOutput(dir, num)
     {
-        let face
-        if(dir == "x" && num == 1)
-        {
-            face = "right"
-        } else if (dir == "x" && num == -1)
-        {
-            face = "left"
-        } else if (dir == "y" && num == 1)
-        {
-            face = "down"
-        }  else if (dir == "y" && num == -1)
-        {
-            face = "up"
-        }
         return () => {
-            if(!this.parent.checkAdjacent(face) && this.parent.withinBounds(face))
+            if(!this.parent.checkAdjacent(dir, num) && this.parent.withinBounds(dir, num))
             {
-                this.parent[dir] += num
+                this.parent[dir] += num;
             }
         }
     }
 
-    swapOutput(dir)
+    swapOutput(dir, num)
     {
         return () => {
-            const adj = this.parent.checkAdjacent(dir)
+            const adj = this.parent.checkAdjacent(dir, num);
             if(adj)
             {
-                const target = adj[0]
-                const targetCoords = [target.x, target.y];
-                target.x = this.parent.x;
-                target.y = this.parent.y;
-                this.parent.x = targetCoords[0];
-                this.parent.y = targetCoords[1];
+                [adj.x, this.parent.x] = [this.parent.x, adj.x];
+                [adj.y, this.parent.y] = [this.parent.y, adj.y];
             }
         }
     }
 
     neuronOutput(num)
     {
-        return () => {return false};
-        // return () => {this.connections[num].current += connection.strength};
+        return () => {this.parent.activateNeuron(num)};
+    }
+
+    breakdownInput(str)
+    {
+        let axis, num;
+        const split = str.split(/[xy]/i);
+        const type = split[0];
+
+        if(split.length > 1)
+        {
+            axis = str.slice(type.length, type.length + 1).toLowerCase();
+            num = Number(split[1]);
+        }
+
+        return [type, axis, num];
     }
 
     stimulate(connectionOutput)
     {
-        let outputFunction;
-        switch(connectionOutput)
+        if(typeof connectionOutput == "number")
         {
-            case "moveL":
-                outputFunction = this.moveOutput("x", -1);
-                break;
-            case "moveR":
-                outputFunction = this.moveOutput("x", 1);
-                break;
-            case "moveU":
-                outputFunction = this.moveOutput("y", -1);
-                break;
-            case "moveD":
-                outputFunction = this.moveOutput("y", 1);
-                break;
+            return this.neuronOutput(connectionOutput);
+        }
+
+        let outputFunction, type, axis, num;
+        [type, axis, num] = this.breakdownInput(connectionOutput);
+        const randDir = choose(["x", "y"]);
+        const randNum = choose([1, -1]);
+
+        switch(type)
+        {
             case "moveRand":
-                const moveDir = choose(["x", "y"]);
-                const num = choose([1, -1]);
-                outputFunction = this.moveOutput(moveDir, num);
+                outputFunction = this.moveOutput(randDir, randNum);
                 break;
-            case "swapL":
-                outputFunction = this.swapOutput("left");
-                break;
-            case "swapR":
-                outputFunction = this.swapOutput("right");
-                break;
-            case "swapU":
-                outputFunction = this.swapOutput("up");
-                break;
-            case "swapD":
-                outputFunction = this.swapOutput("down");
+            case "move":
+                outputFunction = this.moveOutput(axis, num);
                 break;
             case "swapRand":
-                const swapDir = choose(["left", "right", "up", "down"]);
-                outputFunction = this.swapOutput(swapDir);
+                outputFunction = this.swapOutput(randDir, randNum);
+                break;
+            case "swap":
+                outputFunction = this.moveOutput(axis, num);
                 break;
             default:
-                if(typeof connectionOutput == "number")
-                {
-                    outputFunction = this.neuronOutput(connectionOutput)
-                } else {
-                    outputFunction = () => { return false; }
-                }
+                outputFunction = () => { return false; };
                 break;
         }
         return outputFunction
@@ -189,140 +157,99 @@ class Neuron
     decCalc(num)
     {
         let calc = 0;
+
         if(num < 0.5)
         {
-            calc = 4 * (num - 0.5) * (num - 0.5) + 0.1;
+            calc = Math.min((4 * (num - 0.5) * (num - 0.5) + 0.1), 1);
         } else {
             calc = 0;
         }
-        if(calc > 1)
-        {
-            calc = 1;
-        }
+
         return calc;
+    }
+
+    edgeDetect(dir, num)
+    {
+        const parentAxis = this.parent[dir];
+        const mapAxis = this.parent.parent[`map${dir.toUpperCase()}`];
+
+        if(num < 0)
+        {
+            return this.decCalc(parentAxis/mapAxis);
+        } else {
+            return this.decCalc((mapAxis - parentAxis)/mapAxis);
+        }
+    }
+
+    entityDetect(dir, num)
+    {
+        let otherAxis, lowestDistance;
+        dir == "x" ? otherAxis = "y" : otherAxis = "x";
+        const entArray = this.parent.parent[`${otherAxis}Entities`];
+        const parentAxis = this.parent[dir];
+        const mapAxis =this.parent.parent[`map${dir.toUpperCase()}`];
+
+        (num > 0) ? lowestDistance = mapAxis - parentAxis : lowestDistance = parentAxis;
+        const greatestDistance = lowestDistance;
+
+        for(var i = 0; i < entArray.length; i++)
+        {
+            if(num < 0 && entArray[i][dir] < parentAxis && (parentAxis - entArray[i][dir]) < lowestDistance)
+            {
+                lowestDistance = parentAxis - entArray[i][dir];
+            } else if (num > 0 && entArray[i][dir] > parentAxis && (entArray[i][dir] - parentAxis) < lowestDistance)
+            {
+                lowestDistance = entArray[i][dir] - parentAxis;
+            }
+        }
+
+        return this.decCalc(lowestDistance/greatestDistance);  
+    }
+
+    spaceDetect(dir, num)
+    {
+        let otherAxis, lowestDistance;
+        dir == "x" ? otherAxis = "y" : otherAxis = "x";
+        const entArray = this.parent.parent[`${otherAxis}Entities`];
+        const parentAxis = this.parent[dir];
+        const mapAxis =this.parent.parent[`map${dir.toUpperCase()}`];
+
+        (num > 0) ? lowestDistance = mapAxis - parentAxis : lowestDistance = parentAxis;
+        const greatestDistance = lowestDistance;
+
+        for(var i = 0; i < entArray.length; i++)
+        {
+            if(num < 0 && entArray[i][dir] < parentAxis && (parentAxis - entArray[i].y) < lowestDistance)
+            {
+                lowestDistance = parentAxis - entArray[i].y;
+            } else if(num > 0 && entArray[i][dir] > parentAxis && (entArray[i][dir] - parentAxis) < lowestDistance)
+            {
+                lowestDistance = entArray[i].x - parentAxis;
+            }
+        }
+
+        return this.decCalc((greatestDistance - lowestDistance)/greatestDistance);
     }
 
     detect(connectionStimulus, connectionType)
     {
-        // this.stimuli = ["edgeL", "edgeR", "edgeU", "edgeD", "entityL", "entityR", "entityU", "entityD", "spaceL", "spaceR", "spaceU", "spaceD"];
+        // ADD I
         let value = 0;
-        const parentX = this.parent.x;
-        const parentY = this.parent.y;
-        const mapX = this.parent.parent.mapX;
-        const mapY = this.parent.parent.mapY;
-        const entArray = this.parent.parent.entities;
-        let lowestDistance = 0;
-        switch(connectionStimulus)
+        let type, axis, num;
+        [type, axis, num] = this.breakdownInput(connectionStimulus);
+ 
+        switch(type)
         {
-            case "edgeL":
-                const elSum = parentX/mapX;
-                value = this.decCalc(elSum)
+            case "edge":
+                value = this.edgeDetect(axis, num);
                 break;
-            case "edgeR":
-                const erSum = (mapX - parentX)/mapX;
-                value = this.decCalc(erSum)
+            case "entity":
+                value = this.entityDetect(axis, num);
                 break;
-            case "edgeU":
-                const euSum = parentY/mapY;
-                value = this.decCalc(euSum)
-                break;
-            case "edgeD":
-                const edSum = (mapY - parentY)/mapY;
-                value = this.decCalc(edSum)
-                break;
-            case "entityL":
-                lowestDistance = mapX;
-                for(var i = 0; i < entArray.length; i++)
-                {
-                    if(entArray[i].y == parentY && entArray[i].x < parentX && (parentX - entArray[i].x) < lowestDistance)
-                    {
-                        lowestDistance = parentX - entArray[i].x;
-                    }
-                }
-                value = this.decCalc(lowestDistance/parentX);
-                break;
-            case "entityR":
-                lowestDistance = mapX;
-                for(var i = 0; i < entArray.length; i++)
-                {
-                    if(entArray[i].y == parentY && entArray[i].x > parentX && (entArray[i].x - parentX) < lowestDistance)
-                    {
-                        lowestDistance = entArray[i].x - parentX;
-                    }
-                }
-                value = this.decCalc(lowestDistance/mapX);
-                break;
-            case "entityU":
-                lowestDistance = mapY;
-                for(var i = 0; i < entArray.length; i++)
-                {
-                    if(entArray[i].x == parentX && entArray[i].y < parentY && (parentY - entArray[i].y) < lowestDistance)
-                    {
-                        lowestDistance = parentY - entArray[i].y;
-                    }
-                }
-                value = this.decCalc(lowestDistance/parentY);
-                break;
-            case "entityD":
-                lowestDistance = mapY;
-                for(var i = 0; i < entArray.length; i++)
-                {
-                    if(entArray[i].x == parentX && entArray[i].y > parentY && (entArray[i].y - parentY) < lowestDistance)
-                    {
-                        lowestDistance = entArray[i].y - parentY;
-                    }
-                }
-                value = this.decCalc(lowestDistance/mapY);
-                break;
-            case "spaceL":
-                lowestDistance = parentX;
-                for(var i = 0; i < entArray.length; i++)
-                {
-                    if(entArray[i].y == parentY && entArray[i].x < parentX && (parentX - entArray[i].x) < lowestDistance)
-                    {
-                        lowestDistance = parentX - entArray[i].x;
-                    }
-                }
-                value = this.decCalc((mapX - lowestDistance)/mapX);
-                break;
-            case "spaceR":
-                lowestDistance = mapX - parentX;
-                for(var i = 0; i < entArray.length; i++)
-                {
-                    if(entArray[i].y == parentY && entArray[i].x > parentX && (entArray[i].x - parentX) < lowestDistance)
-                    {
-                        lowestDistance = entArray[i].x - parentX;
-                    }
-                }
-                value = this.decCalc((mapX - lowestDistance)/mapX);
-                break;
-            case "spaceU":
-                lowestDistance = parentY;
-                for(var i = 0; i < entArray.length; i++)
-                {
-                    if(entArray[i].x == parentX && entArray[i].y < parentY && (parentY - entArray[i].y) < lowestDistance)
-                    {
-                        lowestDistance = parentY - entArray[i].y;
-                    }
-                }
-                value = this.decCalc((mapY - lowestDistance)/mapY);
-                break;
-            case "spaceD":
-                lowestDistance = mapY - parentY;
-                for(var i = 0; i < entArray.length; i++)
-                {
-                    if(entArray[i].x == parentX && entArray[i].y > parentY && (entArray[i].y - parentY) < lowestDistance)
-                    {
-                        lowestDistance = entArray[i].y - parentY;
-                    }
-                }
-                value = this.decCalc((mapY - lowestDistance)/mapY);
+            case "space":
+                value = this.spaceDetect(axis, num);
                 break;
         }
-        // if(connectionType == "I")
-        // {
-        //     value = 1 - value;
-        // }
         return value;
     }
 
@@ -333,7 +260,7 @@ class Neuron
         for(var i = 0; i < this.connections.length; i++)
         {
             const connection = this.connections[i];
-            const stimuliValue = this.detect(connection.stimulus, connection.type)
+            const stimuliValue = this.detect(connection.stimulus, connection.type);
             if(stimuliValue > greatestValue)
             {
                 greatestValue = stimuliValue;
@@ -341,7 +268,7 @@ class Neuron
             }
         }
 
-        return this.stimulate(this.connections[greatestIndex].output)
+        return this.stimulate(this.connections[greatestIndex].output);
     }
 }
 
@@ -355,24 +282,16 @@ class Entity
         this.connections = connections;
         this.neurons = [];
 
-        this.stimuli = ["edgeL", "edgeR", "edgeU", "edgeD", "entityL", "entityR", "entityU", "entityD", "spaceL", "spaceR", "spaceU", "spaceD"];
+        this.stimuli = ["edgeX-1", "edgeX1", "edgeY-1", "edgeY1", "entityX-1", "entityX1", "entityY-1", "entityY1", "spaceX-1", "spaceX1", "spaceY-1", "spaceY1"];
         this.types = ["I", "E"];
-        this.output = ["moveL", "moveR", "moveU", "moveD", "moveRand", "swapL", "swapR", "swapU", "swapD", "swapRand", "stop"];
+        this.output = ["moveX-1", "moveX1", "moveY-1", "moveY1", "moveRand", "swapX-1", "swapX1", "swapY-1", "swapY1", "swapRand", "stop"];
 
-        if(!entity1 || !entity2)
+        for(var i = 0; i < neurons; i++)
         {
-            for(var i = 0; i < neurons; i++)
-            {
-                this.createNeuron(i);
-                this.output.push(i);
-            }
-        } else {
-            for(var i = 0; i < neurons; i++)
-            {
-                this.inheritNeuron(i, entity1, entity2);
-                this.output.push(i);
-            }
+            !entity1 || !entity2 ? this.createNeuron(i) : this.inheritNeuron(i, entity1, entity2);
+            this.output.push(i);
         }
+
         this.developColour();
     }
 
@@ -390,105 +309,86 @@ class Entity
             for(var j = 0; j < this.neurons[i].connections.length; j++)
             {
                 const connection = this.neurons[i].connections[j];
-                colourValues[index] += this.stimuli.indexOf(connection.stimulus)/(this.stimuli.length - 1)
-                colourValues[index] += this.types.indexOf(connection.type)/(this.types.length - 1)
-                colourValues[index] += this.output.indexOf(connection.output)/(this.output.length - 1)
-                colourCount[index] += 3
+                colourValues[index] += this.stimuli.indexOf(connection.stimulus)/(this.stimuli.length - 1);
+                colourValues[index] += this.types.indexOf(connection.type)/(this.types.length - 1);
+                colourValues[index] += this.output.indexOf(connection.output)/(this.output.length - 1);
+                colourCount[index] += 3;
                 index++;
             }
         }
-        if(colourCount[1] == 0)
-        {
-            colourCount[1] = 1;
-        }
-        if(colourCount[2] == 0)
-        {
-            colourCount[2] = 1;
-        }
+        colourCount[1] = Math.max(colourCount[1], 1);
+        colourCount[2] = Math.max(colourCount[2], 1);
         let colour1 = 255 * colourValues[0]/colourCount[0];
         let colour2 = 255 * colourValues[1]/colourCount[1];
         let colour3 = 255 * colourValues[2]/colourCount[2];
-        this.colour = [colour1, colour2, colour3]
+
+        this.colour = [colour1, colour2, colour3];
     }
 
     createNeuron(neuronNumber)
     {
         const neuron = new Neuron(this, this.connections, neuronNumber);
-        this.neurons.push(neuron)
+        this.neurons.push(neuron);
     }
 
     inheritNeuron(neuronNumber, entity1, entity2)
     {
         const neuron = new Neuron(this, this.connections, neuronNumber, entity1, entity2);
-        this.neurons.push(neuron)
+        this.neurons.push(neuron);
     }
 
-    checkAdjacent(direction)
+    checkAdjacent(direction, offset)
     {
-        const x = this.x;
-        const y = this.y;
-        const array = this.parent.entities;
-        const left = [x - 1, y];
-        const right = [x + 1, y];
-        const up = [x, y - 1];
-        const down = [x, y + 1];
-        const adjacent = []
+        let entityAxis = 0;
+        let axis = 0;
+        let adjacent = false;
+        let otherAxis = "";
 
-        // NEEDS HEAVY CLEAN UP
-        for(var i = 0; i < array.length; i++)
-        {
-            const entity = array[i];
-            if((direction == "left" || direction == "all") && entity.x == left[0] && entity.y == left[1])
-            {
-                adjacent.push(entity);
-            }
-            if((direction == "right" || direction == "all") && entity.x == right[0] && entity.y == right[1])
-            {
-                adjacent.push(entity);
-            }
-            if((direction == "up" || direction == "all") && entity.x == up[0] && entity.y == up[1])
-            {
-                adjacent.push(entity);
-            }
-            if((direction == "down" || direction == "all") && entity.x == down[0] && entity.y == down[1])
-            {
-                adjacent.push(entity);
-            }
-        }
-        if(adjacent.length == 0)
+        direction == "x" ? otherAxis = "y" : otherAxis = "x";
+        axis = this[direction];
+        entityAxis = this.parent[`${otherAxis}Entities`][this[otherAxis]];
+        
+        if(entityAxis == undefined)
         {
             return false;
-        } else {
-            return adjacent;
+        }
+
+        for(var i = 0; i < entityAxis.length; i++)
+        {
+            if(entityAxis[i][direction] == axis + offset)
+            {
+                adjacent = entityAxis[i];
+            }
+        }
+
+        return adjacent;
+    }
+
+    withinBounds(direction, offset)
+    {
+        const mapDir = `map${direction.toUpperCase()}`;
+        const upperBound = this.parent[mapDir] - 2;
+
+        if(offset > 0)
+        {
+            return this[direction] < upperBound ? true : false;
+        } else if (offset < 0) {
+            return this[direction] > 0 ? true : false;
         }
     }
 
-    withinBounds(direction)
+    activateNeuron(i)
     {
-        switch(direction)
-        {
-            case "left":
-                return this.x > 0 ? true : false;
-                break;
-            case "right":
-                return this.x < (this.parent.mapX - 2) ? true : false;
-                break;
-            case "up":
-                return this.y > 0 ? true : false;
-                break;
-            case "down":
-                return this.y < (this.parent.mapY - 2) ? true : false;
-                break;
-        }
+        const neuron = this.neurons[i];
+        const outcome = neuron.evaluate();
+        outcome();
     }
 
     activateNeurons()
     {
         for(var i = 0; i < this.neurons.length; i++)
         {
-            const neuron = this.neurons[i];
-            const outcome = neuron.evaluate();
-            outcome();
+            this.activateNeuron(i);
         }
     }
 }
@@ -509,13 +409,15 @@ class Controller
         this.gamespeed = 1;
         this.steps = 0;
         this.generation = 1;
+        this.xEntities = {};
+        this.yEntities = {};
 
         this.width = window.innerWidth;
         this.height = window.innerHeight;
         this.mapX = this.width/this.scale;
         this.mapY = this.height/this.scale;
         this.surviveCoords = [0 + surviveCoords[0] * this.width, 0 + surviveCoords[1] * this.height];
-        this.surviveSize = [surviveSize[0] * this.mapX, surviveSize[1] * this.mapY]
+        this.surviveSize = [surviveSize[0] * this.mapX, surviveSize[1] * this.mapY];
 
         this.canvas = document.getElementById("myCanvas");
         this.canvas.width = this.mapX * this.scale;
@@ -528,12 +430,12 @@ class Controller
     {
         const standardSurviveCoords = [this.surviveCoords[0]/this.width, this.surviveCoords[1]/this.height];
         const standardSurviveSize = [this.surviveSize[0]/this.mapX, this.surviveSize[1]/this.mapY];
-        console.log(`Amount: ${this.quantities}\nScale: ${this.scale}\nConnections: ${this.connections}\nGenerationSteps: ${this.generationSteps}\nMutationRate: ${this.mutationRate}\nSurviveCoords: ${standardSurviveCoords}\nSurviveSize: ${standardSurviveSize}`)
+        console.log(`Amount: ${this.quantities}\nScale: ${this.scale}\nConnections: ${this.connections}\nGenerationSteps: ${this.generationSteps}\nMutationRate: ${this.mutationRate}\nSurviveCoords: ${standardSurviveCoords}\nSurviveSize: ${standardSurviveSize}`);
     }
 
     scaleSurvive(newX, newY)
     {
-        this.surviveSize = [newX * this.mapX, newY * this.mapY]
+        this.surviveSize = [newX * this.mapX, newY * this.mapY];
     }
 
     moveSurvive(newX, newY)
@@ -558,25 +460,37 @@ class Controller
     render()
     {
         this.clearScreen()
+        this.xEntities = {};
+        this.yEntities = {};
+
         for(var i = 0; i < this.entities.length; i++)
         {
-            this.drawEntity(this.entities[i].x, this.entities[i].y, this.entities[i].colour)
+            const entity = this.entities[i];
+            this.drawEntity(entity.x, entity.y, entity.colour);
+            this.xEntities[entity.x] != undefined ? this.xEntities[entity.x].push(entity) : this.xEntities[entity.x] = [entity];
+            this.yEntities[entity.y] != undefined ? this.yEntities[entity.y].push(entity) : this.yEntities[entity.y] = [entity];
         }
     }
     
     addEntity(x, y)
     {
-        const entity = new Entity(x, y, this.neurons, this.connections, this)
-        this.entities.push(entity)
+        const entity = new Entity(x, y, this.neurons, this.connections, this);
+        this.entities.push(entity);
     }
 
     entityInSpace(x, y)
     {
-        const array = this.entities
-        for(var i = 0; i < array.length; i++)
+        if(this.xEntities[x] == undefined || this.yEntities[y] == undefined)
         {
-            const entity = array[i]
-            if(entity.x == x && entity.y == y)
+            return false;
+        }
+
+        let entArr;
+        this.xEntities[x].length > this.yEntities[y].length ? entArr = this.yEntities[y] : entArr = this.xEntities[x];
+
+        for(var i = 0; i < entArr.length; i++)
+        {
+            if(entArr[i].x == x && entArr[i].y == y)
             {
                 return true;
             }
@@ -586,16 +500,23 @@ class Controller
 
     detailEntityInSpace(xx, yy)
     {
-        const array = this.entities
-        const x = Math.floor(xx/this.scale)
-        const y = Math.floor(yy/this.scale)
+        const x = Math.floor(xx/this.scale);
+        const y = Math.floor(yy/this.scale);
 
-        for(var i = 0; i < array.length; i++)
+        if(this.xEntities[x] == undefined || this.yEntities[y] == undefined)
         {
-            const entity = array[i]
+            return false;
+        }
+
+        let entArr;
+        this.xEntities[x].length > this.yEntities[y].length ? entArr = this.yEntities[y] : entArr = this.xEntities[x];
+
+        for(var i = 0; i < entArr.length; i++)
+        {
+            const entity = entArr[i];
             if(entity.x == x && entity.y == y)
             {
-                console.log(i)
+                console.log(i);
                 return entity;
             }
         }
@@ -606,23 +527,22 @@ class Controller
         var retryCount = 0;
         for(var i = 0; i < this.quantities; i++)
         {
-            const randX = randInt(this.mapX - 1);
-            const randY = randInt(this.mapY - 1);
+            const randX = Math.max(randInt(this.mapX - 1), 0);
+            const randY = Math.max(randInt(this.mapY - 1), 0);
 
             if(!this.entityInSpace(randX, randY))
             {
-                this.addEntity(randX, randY)
-            } else if(retryCount < this.quantities/10) {
-                i--
-                retryCount++
+                this.addEntity(randX, randY);
+            } else if(retryCount < this.quantities) {
+                i--;
+                retryCount++;
             }
         }
     }
 
     inheritIndex()
     {
-        // NEEDS HEAVY CLEAN UP
-        const mutation = this.mutationRate
+        const mutation = this.mutationRate;
 
         const rand = Math.floor(Math.random() * 101);
         const parentRate = (100 - mutation)/2;
@@ -649,16 +569,16 @@ class Controller
         var retryCount = 0;
         for(var i = 0; i < array.length; i++)
         {
-            const randX = randInt(this.mapX) - 1;
-            const randY = randInt(this.mapY) - 1;
+            const randX = Math.max(randInt(this.mapX - 1), 0);
+            const randY = Math.max(randInt(this.mapY - 1), 0);
 
             if(!this.entityInSpace(randX, randY))
             {
                 array[i].x = randX;
                 array[i].y = randY;
             } else if(retryCount < array.length * 2) {
-                i--
-                retryCount++
+                i--;
+                retryCount++;
             }
         }
     }
@@ -673,7 +593,7 @@ class Controller
                 for(var k = 0; k < entityArray[i].neurons[j].connections.length; k++)
                 {
                     // const tag = `${entityArray[i].neurons[j].connections[k].type}_${entityArray[i].neurons[j].connections[k].stimulus}_${entityArray[i].neurons[j].connections[k].output}`
-                    const tag = `${entityArray[i].neurons[j].connections[k].stimulus}_${entityArray[i].neurons[j].connections[k].output}`
+                    const tag = `${entityArray[i].neurons[j].connections[k].stimulus}_${entityArray[i].neurons[j].connections[k].output}`;
                     if(traits[tag] != undefined)
                     {
                         traits[tag] += 1;
@@ -683,19 +603,20 @@ class Controller
                 }
             }
         }
-        console.log(traits)
+        console.log(traits);
     }
 
-    newGeneration()
+    getSurvivors()
     {
-        // NEEDS HEAVY CLEAN UP
-        const survivors = []
+        const survivors = [];
         for(var i = 0; i < this.entities.length; i++)
         {
             const entity = this.entities[i];
-            const outerX = this.surviveSize[0] + this.surviveCoords[0]/this.scale;
-            const outerY = this.surviveSize[1] + this.surviveCoords[1]/this.scale;
-            if((entity.x >= this.surviveCoords[0]/this.scale && entity.x < outerX) && (entity.y >= this.surviveCoords[1]/this.scale && entity.y < outerY))
+            const surviveCoordsX = this.surviveCoords[0]/this.scale;
+            const surviveCoordsY = this.surviveCoords[1]/this.scale;
+            const outerX = this.surviveSize[0] + surviveCoordsX;
+            const outerY = this.surviveSize[1] + surviveCoordsY;
+            if((entity.x >= surviveCoordsX && entity.x < outerX) && (entity.y >= surviveCoordsY && entity.y < outerY))
             {
                 survivors.push(entity);
             }
@@ -703,10 +624,15 @@ class Controller
 
         if(survivors.length < 2)
         {
-            location.reload()
-            return;
+            location.reload();
+        } else {
+            return survivors;
         }
+    }
 
+    newGeneration()
+    {
+        const survivors = this.getSurvivors();
         this.displayTraits(survivors);
 
         this.entities = [];
@@ -727,7 +653,8 @@ class Controller
                 entity2 = survivors[j + 1];
             }
 
-            this.entities.push(this.createOffspring(entity1, entity2))
+            const child = this.createOffspring(entity1, entity2);
+            this.entities.push(child);
         }
         this.placeSurvivors(this.entities);
     }
@@ -743,17 +670,17 @@ class Controller
             this.newGeneration();
             this.steps = 0;
             this.generation += 1;
-            console.log("GENERATION", this.generation)
+            console.log("GENERATION", this.generation);
         }
         this.render();
         this.steps += 1;
-        console.log(this.steps)
+        console.log(this.steps);
     }
 
     play(time = 10)
     {
         this.running = true;
-        this.interval = setInterval(controller.process.bind(controller), time)
+        this.interval = setInterval(controller.process.bind(controller), time);
     }
 
     pause()
@@ -761,22 +688,22 @@ class Controller
         this.running = false;
         if(this.interval != undefined)
         {
-            clearInterval(this.interval)
+            clearInterval(this.interval);
         }
     }
 
     start()
     {
-        this.clearScreen()
-        this.randEntityPlace()
-        this.render()
+        this.clearScreen();
+        this.randEntityPlace();
+        this.render();
     }
 }
 //#endregion
 
 // #region Running Code
 // quantities, scale, neurons, connections, generationSteps, mutationRate, surviveCoords, surviveSize
-const controller = new Controller(500, 10, 2, 4, 300, 10, [0.4, 0.4], [0.2, 0.2]);
+const controller = new Controller(2000, 10, 2, 4, 300, 10, [0.4, 0.4], [0.2, 0.2]);
 controller.start();
 
 window.addEventListener("keydown", function (event) {
@@ -811,10 +738,10 @@ window.addEventListener("keydown", function (event) {
 window.addEventListener('click', (event) => {
     if(event.button == 0)
     {
-        const entity = controller.detailEntityInSpace(event.pageX, event.pageY)
+        const entity = controller.detailEntityInSpace(event.pageX, event.pageY);
         if(entity != undefined)
         {
-            console.log(entity)
+            console.log(entity);
         }
     }
     
