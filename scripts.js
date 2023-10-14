@@ -54,7 +54,7 @@ class Neuron
         const stimulus = choose(this.stimuli);
         const result = choose(this.output);
 
-        this.createConnection(stimulus, able, result);
+        this.createConnection(stimulus, result);
     }
 
     inheritConnection(entity1, entity2, i)
