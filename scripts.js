@@ -26,7 +26,6 @@ class Neuron
     constructor(parent, connections, neuronNumber, entity1 = false, entity2 = false)
     {
         this.stimuli = copyArr(parent.stimuli);
-        this.types = copyArr(parent.types);
         this.output = copyArr(parent.output);
         this.parent = parent;
         
@@ -44,16 +43,15 @@ class Neuron
         }
     }
 
-    createConnection(stimulus, type, output)
+    createConnection(stimulus, output)
     {
-        const connection = {"stimulus": stimulus, "type": type, "output": output};
+        const connection = {"stimulus": stimulus, "output": output};
         this.connections.push(connection);
     }
 
     createRandConnection()
     {
         const stimulus = choose(this.stimuli);
-        const able = choose(this.types);
         const result = choose(this.output);
 
         this.createConnection(stimulus, able, result);
@@ -72,10 +70,10 @@ class Neuron
         } else if (rand > mutation && rand <= mutation + parentRate)
         {
             const entity1NeuronConnection = entity1.neurons[this.neuronNumber].connections[i];
-            this.createConnection(entity1NeuronConnection.stimulus, entity1NeuronConnection.type, entity1NeuronConnection.output);
+            this.createConnection(entity1NeuronConnection.stimulus, entity1NeuronConnection.output);
         } else {
             const entity2NeuronConnection = entity2.neurons[this.neuronNumber].connections[i];
-            this.createConnection(entity2NeuronConnection.stimulus, entity2NeuronConnection.type, entity2NeuronConnection.output);
+            this.createConnection(entity2NeuronConnection.stimulus, entity2NeuronConnection.output);
         }
     }
 
@@ -231,9 +229,8 @@ class Neuron
         return this.decCalc((greatestDistance - lowestDistance)/greatestDistance);
     }
 
-    detect(connectionStimulus, connectionType)
+    detect(connectionStimulus)
     {
-        // ADD I
         let value = 0;
         let type, axis, num;
         [type, axis, num] = this.breakdownInput(connectionStimulus);
@@ -260,7 +257,7 @@ class Neuron
         for(var i = 0; i < this.connections.length; i++)
         {
             const connection = this.connections[i];
-            const stimuliValue = this.detect(connection.stimulus, connection.type);
+            const stimuliValue = this.detect(connection.stimulus);
             if(stimuliValue > greatestValue)
             {
                 greatestValue = stimuliValue;
@@ -283,7 +280,6 @@ class Entity
         this.neurons = [];
 
         this.stimuli = ["edgeX-1", "edgeX1", "edgeY-1", "edgeY1", "entityX-1", "entityX1", "entityY-1", "entityY1", "spaceX-1", "spaceX1", "spaceY-1", "spaceY1"];
-        this.types = ["I", "E"];
         this.output = ["moveX-1", "moveX1", "moveY-1", "moveY1", "moveRand", "swapX-1", "swapX1", "swapY-1", "swapY1", "swapRand", "stop"];
 
         for(var i = 0; i < neurons; i++)
@@ -310,9 +306,8 @@ class Entity
             {
                 const connection = this.neurons[i].connections[j];
                 colourValues[index] += this.stimuli.indexOf(connection.stimulus)/(this.stimuli.length - 1);
-                colourValues[index] += this.types.indexOf(connection.type)/(this.types.length - 1);
                 colourValues[index] += this.output.indexOf(connection.output)/(this.output.length - 1);
-                colourCount[index] += 3;
+                colourCount[index] += 2;
                 index++;
             }
         }
@@ -592,7 +587,6 @@ class Controller
             {
                 for(var k = 0; k < entityArray[i].neurons[j].connections.length; k++)
                 {
-                    // const tag = `${entityArray[i].neurons[j].connections[k].type}_${entityArray[i].neurons[j].connections[k].stimulus}_${entityArray[i].neurons[j].connections[k].output}`
                     const tag = `${entityArray[i].neurons[j].connections[k].stimulus}_${entityArray[i].neurons[j].connections[k].output}`;
                     if(traits[tag] != undefined)
                     {
@@ -703,7 +697,7 @@ class Controller
 
 // #region Running Code
 // quantities, scale, neurons, connections, generationSteps, mutationRate, surviveCoords, surviveSize
-const controller = new Controller(2000, 10, 2, 4, 300, 10, [0.4, 0.4], [0.2, 0.2]);
+const controller = new Controller(500, 10, 2, 4, 300, 10, [0.4, 0.4], [0.2, 0.2]);
 controller.start();
 
 window.addEventListener("keydown", function (event) {
